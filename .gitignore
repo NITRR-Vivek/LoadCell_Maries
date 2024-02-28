@@ -1,0 +1,8 @@
+# Removing these files due to space restrictions 
+__pycache__
+build
+dist
+iWinsetup.iss
+LoadCell_WINDOWS_1.5.0_setup.exe    
+myapp.spec
+LoadCell.spec
