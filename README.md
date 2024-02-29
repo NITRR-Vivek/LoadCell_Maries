@@ -1,7 +1,12 @@
 # LoadCell
 Hello EveryOne, This repository is all about a custom weight measurement system and analysis using a arduino device, a LoadCell sensor and a software.
 
-This is a LoadCell Software made my me for taking the serial input of LoadCell reading through the USB port and one can analyse it for weight or can be analysed for force.
+This is a LoadCell Software made my me for taking the input of LoadCell reading through the USB Serial port and one can analyse it for weight or can be analysed for force.
+<div style="text-align:center;">
+  <img src="https://github.com/NITRR-Vivek/LoadCell_Maries/blob/main/screenshots/LoadCell.gif" width="600" height="318.75" />
+</div>
+
+----
 # Contents
 - [Contents](#contents)
 - [Steps](#steps)
@@ -10,6 +15,7 @@ This is a LoadCell Software made my me for taking the serial input of LoadCell r
 - [Arduino Code](#arduino-code)
 - [Screenshots](#screenshots)
 # Steps
+Please follow these steps carefully :-
 - Please make the Circuit Connections as given below and download the drivers as per device.
 - Download the Setup file for the software given below.
 - Load the code to the arduino device for calibration given below and also inside the documentation tab of the LoadCell software.
