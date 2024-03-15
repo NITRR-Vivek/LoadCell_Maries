@@ -26,6 +26,9 @@ Please follow these steps carefully :-
 - Click on the start button and wait for 2-3 sec so that LoadCell Sensor can become stable.
 - CLick on TARE button if it is not stable at 0.
 - Now put the weight on the LoadCell and Measure it.
+- Click Stop button whenever wants to stop.
+- On Clicking on stop button a prompt will be opened for saving the measured reading in CSV file.
+- Click on Yes to save otherwise Click on No.
 
 
 # Connections and Wiring
