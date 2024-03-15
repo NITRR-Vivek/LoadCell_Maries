@@ -2,6 +2,7 @@
 __pycache__
 build
 dist
+assets
 iWinsetup.iss
 LoadCell_WINDOWS_1.5.0_setup.exe    
 myapp.spec

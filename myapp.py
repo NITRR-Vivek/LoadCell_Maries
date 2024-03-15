@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
 from documentation import DocumentationTab
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import os, sys
+import os, sys, csv
+from datetime import datetime
+import threading
 
 show_weight = True
 # pyinstaller --name LoadCell --onefile --windowed --icon=icon.ico myapp.py
@@ -59,6 +61,8 @@ class LoadCellApp(tk.Tk):
         self.connect_clicked = False
         self.ser = None
         self.weight_data_queue = deque(maxlen=30)
+        self.csv_file = None
+        self.csv_writer = None
 
 
         self.create_sidebar()
@@ -123,7 +127,7 @@ class LoadCellApp(tk.Tk):
     def on_connect(self):
         if not self.connect_clicked:
             self.connect_clicked = True
-            self.ser = self.establish_serial_connection(self.selected_port_var.get(), 57600)
+            self.ser = self.establish_serial_connection(self.selected_port_var.get(), 115200)
             if self.ser:
                 self.display_message(f"Connected to port {self.selected_port_var.get()}")
                 self.connect_button.config(state="disabled")
@@ -139,7 +143,7 @@ class LoadCellApp(tk.Tk):
     def check_connection(self):
         if self.ser is not None and self.ser.is_open:
             try:
-                if self.ser.in_waiting > 0:{}        
+                if self.ser.in_waiting > 0:{}    
             except serial.SerialException as e:
                 self.display_message("Serial port error: Kindly check the connection.")
                 error_message = f"Serial Port error: {str(e)}"
@@ -148,7 +152,7 @@ class LoadCellApp(tk.Tk):
                 self.show_refresh_button()
             except (AttributeError, tk.TclError):
                 print("Error: Object or function is inaccessible")
-        self.after(1000, self.check_connection)        
+        self.after(200, self.check_connection)        
 
     def on_disconnect(self):
         if self.connect_clicked:
@@ -173,6 +177,7 @@ class LoadCellApp(tk.Tk):
         self.refresh_button.pack(pady=10)        
         
     def create_dash_tab(self):
+        self.weight_data = []
         self.main_area = tk.Frame(self.dash_tab)
         self.main_area.pack(side="right", fill="both", expand=True)
 
@@ -193,13 +198,13 @@ class LoadCellApp(tk.Tk):
 
         # Green Button (ON)
         self.green_button = tk.Button(self.main_area, text="START", bg="green", fg="white", font=("Arial", 16),
-                                        command=self.send_on_command)
+                                        command=self.start_data_collection)
         self.green_button.pack(side="right", padx=40, pady=(5, 40), anchor="s")
         self.green_button.configure(width=10)
 
         # Red Button (OFF)
         self.red_button = tk.Button(self.main_area, text="STOP", bg="red", fg="white", font=("Arial", 16),
-                                    command=self.send_off_command)
+                                    command=self.stop_data_collection)
         self.red_button.pack(side="right", padx=40, pady=(5, 40), anchor="s")
         self.red_button.configure(width=10)
         # BLUE Button (TARE)
@@ -226,27 +231,6 @@ class LoadCellApp(tk.Tk):
     def clear_log(self):
         self.error_text.delete("1.0", tk.END)
 
-    def send_on_command(self):
-        if self.ser:
-            self.ser.write(("ON").encode('utf-8'))
-            self.log_error("ON Button Clicked")
-            global show_weight
-            show_weight = True
-            self.update_weight_display()
-        else:
-            # Handle the case when serial connection is not established
-            pass
-
-    def send_off_command(self):
-        if self.ser:
-            self.ser.write(("OFF").encode('utf-8'))
-            self.log_error("OFF Button Clicked")
-            global show_weight
-            show_weight = False
-        else:
-            # Handle the case when serial connection is not established
-            pass
-
     def send_tare(self):
         if self.ser:
             self.ser.write(("TARE").encode('utf-8'))
@@ -266,10 +250,53 @@ class LoadCellApp(tk.Tk):
         self.error_text.insert(tk.END, error_message + "\n")
         self.error_text.see(tk.END)     
 
+    def start_data_collection(self):
+        if self.ser:
+            self.ser.write(("ON").encode('utf-8'))
+            self.log_error("ON Button Clicked")
+            global show_weight
+            show_weight = True
+            threading.Thread(self.update_weight_display()).start()
+        else:
+            pass
+
+    def stop_data_collection(self):
+        if self.ser:
+            self.ser.write(("OFF").encode('utf-8'))
+            self.log_error("OFF Button Clicked")
+            global show_weight
+            show_weight = False
+        else:
+            pass
+        if messagebox.askyesno("Save CSV", "Do you want to save the CSV file?"):
+            self.save_csv_file()
+
+    def save_csv_file(self):
+        try:
+            if self.csv_file:
+                self.csv_file.close()
+            if not self.weight_data:
+                messagebox.showwarning("No Data", "There is no data to save.")
+                return    
+            default_file_name = f"L-Reading-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"    
+            file_path = tk.filedialog.asksaveasfilename(defaultextension=".csv",initialfile=default_file_name, filetypes=[("CSV files", "*.csv")])
+            if file_path:
+                with open(file_path, 'w', newline='') as csv_file:
+                    csv_writer = csv.writer(csv_file)
+                    csv_writer.writerow(['Time', 'Weight (g)'])
+                    for data in self.weight_data:
+                        csv_writer.writerow(data)
+                
+                messagebox.showinfo("Success", "CSV file saved successfully.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save CSV file: {str(e)}")  
+
     def create_setup_tab(self):
         style = ttk.Style()
         style.configure("Custom.TButton", background="#58A2AA", foreground="#58A2AA",font=("Arial", 18))
-
+        style2 = ttk.Style()
+        style2.configure("Red.TButton", background="#58A2AA", foreground="#FF2255",font=("Arial", 18))
+    
         self.image_label2 = tk.Label(self.setup_tab,image=self.background_photo)
         self.image_label2.place(relheight=1,relwidth=1)
 
@@ -277,7 +304,7 @@ class LoadCellApp(tk.Tk):
         self.main_area_setup.place(relx=0.5, rely=0.5, anchor="center")
         
 
-        self.title_setup = tk.Label(self.main_area_setup, text="- Setup the LoadCell Configuration -", font=("verdana", 20),bg='#33cccc')
+        self.title_setup = tk.Label(self.main_area_setup, text="     - Setup the LoadCell Configuration -    ", font=("verdana", 20),bg='#33cccc')
         self.title_setup.grid(row=0, column=0, columnspan=4, padx=10, pady=20, sticky="s")
 
         self.text_zeroload = tk.Label(self.main_area_setup, text="Click Here When No Load is present in LoadCell :", font=("verdana", 12),bg='#33cccc')
@@ -303,9 +330,12 @@ class LoadCellApp(tk.Tk):
         self.note_loaded_button = ttk.Button(self.main_area_setup, text="Note Loaded Value", command=lambda: self.send_command("LOADED_VALUE", self.show_tab_message))
         self.note_loaded_button.grid(row=3, column=0, padx=2, pady=10, sticky="e")  
 
-        self.caliberate_button = ttk.Button(self.main_area_setup, text="Caliberate", command=lambda: self.send_command("CALIBRATION_FACTOR", self.show_tab_message), style="Custom.TButton")
-        self.caliberate_button.grid(row=4, column=0, padx=2, pady=10,columnspan=2)  
-        self.caliberate_button.config(width=40)
+        self.caliberate_button = ttk.Button(self.main_area_setup, text="Set Calibration Factor", command=lambda: self.send_command("SET_CALIBRATION", self.show_tab_message), style="Red.TButton")
+        self.caliberate_button.grid(row=4, column=0, padx=10, pady=10,columnspan=2, sticky='w')  
+        self.caliberate_button.config(width=20)
+        self.caliberate_button = ttk.Button(self.main_area_setup, text="Get Caliberation Factor", command=lambda: self.send_command("CALIBRATION_FACTOR", self.show_tab_message), style="Custom.TButton")
+        self.caliberate_button.grid(row=4, column=0, padx=10, pady=10,columnspan=2,sticky='e')  
+        self.caliberate_button.config(width=20)
 
         self.show_tab_message = tk.Label(self.main_area_setup, text='start caliberating...',font=("verdana", 14, "bold"))
         self.show_tab_message.grid(row=5,column=0,columnspan=3,pady=10,padx=10,sticky='s')
@@ -386,6 +416,14 @@ class LoadCellApp(tk.Tk):
                             weight_value = float(weight_data)
                             self.weight_label.config(text=f"Current Weight: {weight_value} grams")
                             self.weight_data_queue.append(weight_value)
+                            try:
+                                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]  # Include milliseconds
+                                if show_weight:
+                                    self.weight_data.append((timestamp, weight_value))
+                            except ValueError as e:
+                                error_message = f"Error updating weight data to CSV: {str(e)}"
+                                self.log_error(error_message)
+
                             self.update_weight_plot()
 
                         except ValueError as e:
@@ -403,7 +441,7 @@ class LoadCellApp(tk.Tk):
 
                 finally:
                     if not self.is_closed:
-                        self.after(100, self.update_weight_display)
+                        self.after(50, self.update_weight_display)
 
     def update_weight_plot(self):
         try:

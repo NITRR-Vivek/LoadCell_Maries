@@ -20,104 +20,113 @@ class DocumentationTab:
     def __init__(self, parent):
         self.parent = parent
         self.documentation_tab = ttk.Frame(self.parent)
-        self.arduino_code_1 = """
-        
+        self.arduino_code = """
+
+#include <EEPROM.h>
+#include <BluetoothSerial.h>
 #include "HX711.h"
 
 const int LOADCELL_DOUT_PIN = 2;
 const int LOADCELL_SCK_PIN = 4;
+const char *pin = "1234";
+String device_name = "ESP32-LoadCell";
+
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+#if !defined(CONFIG_BT_SPP_ENABLED)
+#error Serial Bluetooth not available or not enabled. It is only available for the ESP32 chip.
+#endif
+
+
+HX711 scale;
 
 float loaded_val;
 float weight;
 float zero_val;
 float CLF;
 
-HX711 scale;
+bool send_weight = false;
 
- void setup() {
-  Serial.begin(57600);
-  Serial.println("Load Cell Interfacing with ESP32 ");
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  scale.tare();
+BluetoothSerial SerialBT;
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("LoadCell Interfacing with ESP32 ");
+  SerialBT.begin(device_name);
+  Serial.printf("The device with name \"%%s\" is started.\\nNow you can pair it with Bluetooth!\\n", device_name.c_str());
+  #ifdef USE_PIN
+    SerialBT.setPin(pin);
+    Serial.println("Using PIN");
+  #endif
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN); 
+  scale.tare();               
 }
 
 void loop() {
- if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-    if (command.equals("ZERO_LOAD")) {
+  //USB Serial Comm
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\\n');
+    command.trim(); // Remove leading and trailing whitespaces
+    processCommand(command);
+  }
+  
+  // Bluetooth Serial Comm
+  if (SerialBT.available() > 0) {
+    String command = SerialBT.readStringUntil('\\n');
+    command.trim(); // Remove leading and trailing whitespaces
+    processCommand(command);
+  }
+
+  if (send_weight) {
+    Serial.println(scale.get_units(10), 1);
+    scale.power_down();
+    delay(10);
+    scale.power_up();
+  }
+}
+
+void processCommand(String command) {
+  if (command == "ON") {
+      // Read CLF value from flash memory and set the scale
+      EEPROM.begin(sizeof(CLF));
+      EEPROM.get(0, CLF);
+      EEPROM.end();
+      scale.set_scale(CLF);
+      send_weight = true;
+    } else if (command == "OFF") {
+      send_weight = false;
+    } else if (command.equals("TARE")) {
+      scale.tare();
+    } else if (command.equals("ZERO_LOAD")) {
       zero_val = scale.get_units(5);
       Serial.println(zero_val);
     } else if (command.equals("LOADED_VALUE")) { 
       loaded_val = scale.get_units(5);
       Serial.println(loaded_val);
     } else if (command.equals("GET_LOAD")) {
-    
-        while (!Serial.available()) {
-            delay(100);
-        }
-        weight = Serial.parseFloat();
-        // Serial.println(weight);
-
-        } else if (command.equals("CALIBRATION_FACTOR")){
-
-            if (weight != 0.0) {
-              CLF = (loaded_val - zero_val) / weight;
-              Serial.println(CLF);
-            } else {
-              Serial.println("Error: Weight is zero, cannot calculate CLF");
-              }
-        }
+      while (!Serial.available()) {
+        delay(10);
+      }
+      weight = Serial.parseFloat();
+      // Serial.println(weight);
+    } else if (command.equals("CALIBRATION_FACTOR")) {
+      if (weight != 0.0) {
+        CLF = (loaded_val - zero_val) / weight;
+        Serial.println(CLF);
+      } else {
+        Serial.println("Error: Weight is zero, cannot calculate CLF");
+      }
+    } else if (command.equals("SET_CALIBRATION")) {
+      // Write CLF value to flash memory
+      EEPROM.begin(sizeof(CLF));
+      EEPROM.put(0, CLF);
+      EEPROM.commit();
+      EEPROM.end();
     }
-    delay(200);
 }
-        
-        """
-        self.arduino_code_2 = """
-#include "HX711.h"
-
-const int LOADCELL_DOUT_PIN = 2;
-const int LOADCELL_SCK_PIN = 4;
-
-float CLF = -311.24;
-
-HX711 scale;
-
-bool send_weight = false;
-
- void setup() {
-  Serial.begin(57600);
-  Serial.println("Load Cell Interfacing with ESP32 ");
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  scale.set_scale(CLF);
-  scale.tare();
-}
-
-void loop() {
- if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    command.trim(); // Remove leading and trailing whitespaces
-    if (command.equals("TARE")) {
-      scale.tare();
-    }else if (command.equals("ON")) {
-      send_weight = true;
- 
-    } else if (command.equals("OFF")) {
-      send_weight = false;
- 
-    } 
-  }
-  if (send_weight) {
-    Serial.println(scale.get_units(10), 1);
-    scale.power_down();			        // put the ADC in sleep mode
-    delay(1000);
-    scale.power_up();
-    
-  } 
-}
-
-
-        """
+"""
 
     def create_documentation_tab(self):
 
@@ -151,7 +160,7 @@ void loop() {
         circuit_label = ttk.Label(self.documentation_frame, text="Circuit Diagram", font=("Arial", 16, "bold"), background="white")
         circuit_label.pack(pady=10,anchor="w")
          
-        circuit_image = Image.open(resource_path("assets\\circuit.jpg"))
+        circuit_image = Image.open(resource_path("assets\\circuit.png"))
         circuit_image_resized = circuit_image.resize((820, 460))
          
         circuit_photo = ImageTk.PhotoImage(circuit_image_resized)
@@ -189,8 +198,8 @@ void loop() {
 
         2. Plug the USB cable to the Computer.
 
-        3. If Load Cell is not Caliberated.
-            ↪ First Copy and push the ESP32 code below to Check the Caliberation Factor
+        3. If Load Cell is not Calibrated.
+            ↪ First Copy and push the ESP32 code below to Check the Calibration Factor and set the calibration Factor.
 
             ► Check the USB Connection.
             ► Go to DashBoard Tab in the LoadCell.exe Software.
@@ -200,11 +209,10 @@ void loop() {
             ► Click on Zeroload Button after 2 sec Ensuring that no Weight is present.
             ► Enter the Value of Known Load to be put on the LoadCell.
             ► Place the Known Load on the LoadCell and Click on Enter after waiting for 2 sec.
-            ► Click on Caliberate Button to Know the Caliberation Factor.
+            ► Click on Caliberate Button to Know the Calibration Factor.
+           ⛳Click on Set New Caliberation Button to Set the new Calibration Factor to the ESP32 .
 
-            ⛳ The Copy and push the Below ESP32 Code for Weight Measurement replacing the Value of CLF with above obtained caliberation Factor.
-
-        4. If Load Cell is Caliberated.
+        4. If Load Cell is Calibrated.
             ↪ Open the Dashboard Tab
 
             ► Check the USB Connection.
@@ -220,46 +228,27 @@ void loop() {
         steps_text_label.pack(fill='both',pady=10, expand=True,anchor='w')
 
         # After the "Step-by-step process" section, add a Text widget for displaying Arduino code
-        arduino_code_caliberate = ttk.Label(self.documentation_frame, text="Arduino Code for Caliberation:", font=("Arial", 16, "bold"), background="white")
+        arduino_code_caliberate = ttk.Label(self.documentation_frame, text="Arduino Code", font=("Arial", 16, "bold"), background="white")
         arduino_code_caliberate.pack(pady=10, anchor="w")
 
         arduino1_frame = ttk.Frame(self.documentation_frame)
         arduino1_frame.pack(padx=10, pady=10, fill="both", expand=True, anchor='w')
 
+        # Copy button for Arduino code 1
+        copy_button = ttk.Button(arduino1_frame, text="Copy the Arduino Code ", command=self.copy_arduino_code)
+        copy_button.pack(pady=10)
+
         # Create a Text widget for displaying Arduino code 1
         arduino_code_caliberate_text = Text(arduino1_frame, wrap="word", bg="white", font=("Courier", 12))
         arduino_code_caliberate_text.pack(side="left", padx=10, pady=10, fill="both", expand=True)
 
-        arduino_code_caliberate_text.insert("1.0", self.arduino_code_1)
+        arduino_code_caliberate_text.insert("1.0", self.arduino_code)
         arduino_code_caliberate_text.config(state="disabled", highlightthickness=0, bd=0)
 
         # Scrollbar for Arduino code 1
         arduino1_scrollbar = Scrollbar(arduino1_frame, orient="vertical", command=arduino_code_caliberate_text.yview)
         arduino1_scrollbar.pack(side="right", fill="y")
         arduino_code_caliberate_text.configure(yscrollcommand=arduino1_scrollbar.set)
-
-        # Copy button for Arduino code 1
-        copy_button_1 = ttk.Button(arduino1_frame, text="Copy Arduino Code for calibration", command=self.copy_arduino_code_1)
-        copy_button_1.pack(pady=10)
-
-        arduino2_frame = ttk.Frame(self.documentation_frame)
-        arduino2_frame.pack(padx=10, pady=10, fill="both", expand=True, anchor='w')
-
-        # Create a Text widget for displaying Arduino code 2
-        arduino_code_weight_text = Text(arduino2_frame, wrap="word", bg="white", font=("Courier", 12))
-        arduino_code_weight_text.pack(side="left", padx=10, pady=10, fill="both", expand=True)
-
-        arduino_code_weight_text.insert("1.0", self.arduino_code_2)
-        arduino_code_weight_text.config(state="disabled", highlightthickness=0, bd=0)
-
-        # Scrollbar for Arduino code 2
-        arduino2_scrollbar = Scrollbar(arduino2_frame, orient="vertical", command=arduino_code_weight_text.yview)
-        arduino2_scrollbar.pack(side="right", fill="y")
-        arduino_code_weight_text.configure(yscrollcommand=arduino2_scrollbar.set)
-
-        # Copy button for Arduino code 2
-        copy_button_2 = ttk.Button(arduino2_frame, text="Copy Arduino Code for weight", command=self.copy_arduino_code_2)
-        copy_button_2.pack(pady=10)
 
         # Troubleshooting section
         troubleshooting_label = ttk.Label(self.documentation_frame, text="Troubleshooting:", font=("Arial", 16, "bold"), background="white")
@@ -326,12 +315,11 @@ void loop() {
         about_us_text_widget.tag_config("website_link", foreground="blue", underline=True)
         about_us_text_widget.tag_bind("website_link", "<Button-1>", lambda event: self.open_link("https://www.linkedin.com/in/vivekadvikk/"))
     
+        self.canvas.yview_moveto(0)
+
     def open_link(self, url):
         webbrowser.open_new(url)   
-    def copy_arduino_code_1(self): 
-        pyperclip.copy(self.arduino_code_1)       
-    def copy_arduino_code_2(self): 
-        pyperclip.copy(self.arduino_code_2)       
-
+    def copy_arduino_code(self): 
+        pyperclip.copy(self.arduino_code)            
     def _on_mousewheel(self, event):
         self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")

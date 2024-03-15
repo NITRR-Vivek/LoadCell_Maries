@@ -30,7 +30,7 @@ Please follow these steps carefully :-
 
 # Connections and Wiring
 ----
-![Circuit Diagram](https://github.com/NITRR-Vivek/LoadCell_Maries/blob/main/screenshots/circuit.jpg)
+![Circuit Diagram](https://github.com/NITRR-Vivek/LoadCell_Maries/blob/main/screenshots/circuit.png)
 
 ----
 # Downloads
