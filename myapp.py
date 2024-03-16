@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 from documentation import DocumentationTab
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import os, sys, csv
-from datetime import datetime
+from datetime import datetime, time
 import threading
 
 show_weight = True
@@ -353,15 +353,15 @@ class LoadCellApp(tk.Tk):
 
     def send_command(self, command, label):
         if self.ser:
-            self.ser.reset_input_buffer()  # Clear serial input buffer
+            self.ser.reset_input_buffer()
             self.ser.write(command.encode('utf-8'))
             self.log_error(f"{command} Button Clicked")
-
             try:
                 get_message = self.ser.readline().decode("utf-8").strip()
-                label.config(text=f"{command} : {get_message}")
+                get_message2 = self.ser.readline().decode("utf-8").strip()
+                label.config(text=f"{command} : {get_message2}")
 
-                self.log_error(get_message)
+                self.log_error(f"{command} :{get_message2}")
 
             except UnicodeDecodeError as e:
                 self.log_error(f"UnicodeDecodeError: {e}")
