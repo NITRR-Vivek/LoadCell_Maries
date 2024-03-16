@@ -38,7 +38,10 @@ Please follow these steps carefully :-
 
 ----
 # Links and Downloads
-1. Link for ESP32 Device Manager Board [JSON Link](https://espressif.github.io/arduino-esp32/package_esp32_index.json)
+1. Link for ESP32 Device Manager Board
+```shell
+https://espressif.github.io/arduino-esp32/package_esp32_index.json
+```
 2. Download the [CP2102 Driver](https://www.silabs.com/documents/public/software/CP210x_Windows_Drivers.zip) for ESP32 and [CH340 Driver](https://sparks.gogo.co.nz/assets/_site_/downloads/CH34x_Install_Windows_v3_4.zip) for ESP8266 or Arduino for Serial Port Communication.
 3. Download the [Software Setup](https://drive.google.com/drive/folders/11rlzUg8vEsF-RtYvvoQi67E6c0J1mg2v?usp=drive_link) File
 
