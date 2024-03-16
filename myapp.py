@@ -359,7 +359,7 @@ class LoadCellApp(tk.Tk):
             try:
                 get_message = self.ser.readline().decode("utf-8").strip()
                 get_message2 = self.ser.readline().decode("utf-8").strip()
-                label.config(text=f"{command} : {get_message2}")
+                label.config(text=f"{command} : {get_message+get_message2}")
 
                 self.log_error(f"{command} :{get_message2}")
 
