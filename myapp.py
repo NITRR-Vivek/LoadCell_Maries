@@ -12,7 +12,7 @@ from datetime import datetime
 import threading
 
 show_weight = True
-# pyinstaller --name LoadCell --onefile --windowed --icon=icon.ico --exclude-module tkinter --upx-dir="C:\Users\VIVEK KUMAR\Downloads\upx-4.2.2-win64\upx-4.2.2-win64" --clean myapp.py
+# pyinstaller --name LoadCell --onefile --windowed --icon=icon.ico  --upx-dir="C:\Users\VIVEK KUMAR\Downloads\upx-4.2.2-win64\upx-4.2.2-win64" --clean myapp.py
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -61,7 +61,7 @@ class LoadCellApp(tk.Tk):
         self.selected_port_var = tk.StringVar()
         self.connect_clicked = False
         self.ser = None
-        self.weight_data_queue = deque(maxlen=30)
+        self.weight_data_queue = deque(maxlen=40)
         self.csv_file = None
         self.csv_writer = None
 
@@ -139,7 +139,8 @@ class LoadCellApp(tk.Tk):
                     self.refresh_button.destroy()
                     self.show_refresh_button()
         else:
-            self.display_message("Already connected! Please refresh the page to reconnect.")        
+            self.display_message("Already connected! Please refresh the page to reconnect.") 
+            self.show_refresh_button()       
 
     def check_connection(self):
         if self.ser is not None and self.ser.is_open:
@@ -163,6 +164,7 @@ class LoadCellApp(tk.Tk):
                 self.display_message("Disconnected")
                 self.connect_button.config(state="normal")
                 self.disconnect_button.config(state="disabled")
+            self.show_refresh_button()    
         else:
             self.display_message("Not connected!")
 
@@ -463,9 +465,10 @@ class LoadCellApp(tk.Tk):
                 self.weight_plot.clf()
                 axis = self.weight_plot.add_subplot(111)
                 axis.plot(range(len(self.weight_data_queue)), self.weight_data_queue, 'b.-')
-                axis.set_xlabel('Time (sec)')
+                axis.set_xlabel('Time ->')
                 axis.set_ylabel('Weight (g)')
                 axis.set_title('Real-time Weight Data')
+                axis.grid(True)
                 self.weight_plot_canvas.draw()
         except Exception as e:
             error_message = f"Serial Exception: {str(e)}"

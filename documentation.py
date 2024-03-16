@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import ttk,Scrollbar
 from tkinter import Text
 import webbrowser
-from hyperlink import URL
 from PIL import Image, ImageTk
 import pyperclip, os, sys
 
