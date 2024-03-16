@@ -12,7 +12,8 @@ from datetime import datetime
 import threading
 
 show_weight = True
-# pyinstaller --name LoadCell --onefile --windowed --icon=icon.ico myapp.py
+# pyinstaller --name LoadCell --onefile --windowed --icon=icon.ico --exclude-module tkinter --upx-dir="C:\Users\VIVEK KUMAR\Downloads\upx-4.2.2-win64\upx-4.2.2-win64" --clean myapp.py
+
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
@@ -127,7 +128,7 @@ class LoadCellApp(tk.Tk):
     def on_connect(self):
         if not self.connect_clicked:
             self.connect_clicked = True
-            self.ser = self.establish_serial_connection(self.selected_port_var.get(), 115200)
+            self.ser = self.establish_serial_connection(self.selected_port_var.get(), 500000)
             if self.ser:
                 self.display_message(f"Connected to port {self.selected_port_var.get()}")
                 self.connect_button.config(state="disabled")
@@ -177,7 +178,6 @@ class LoadCellApp(tk.Tk):
         self.refresh_button.pack(pady=10)        
         
     def create_dash_tab(self):
-        self.weight_data = []
         self.main_area = tk.Frame(self.dash_tab)
         self.main_area.pack(side="right", fill="both", expand=True)
 
@@ -251,6 +251,7 @@ class LoadCellApp(tk.Tk):
         self.error_text.see(tk.END)     
 
     def start_data_collection(self):
+        self.weight_data = []
         if self.ser:
             self.ser.write(("ON").encode('utf-8'))
             self.log_error("ON Button Clicked")
@@ -331,23 +332,34 @@ class LoadCellApp(tk.Tk):
         self.note_loaded_button.grid(row=3, column=0, padx=2, pady=10, sticky="e")  
 
         self.caliberate_button = ttk.Button(self.main_area_setup, text="Set Calibration Factor", command=lambda: self.send_command("SET_CALIBRATION", self.show_tab_message), style="Red.TButton")
-        self.caliberate_button.grid(row=4, column=0, padx=10, pady=10,columnspan=2, sticky='w')  
-        self.caliberate_button.config(width=20)
-        self.caliberate_button = ttk.Button(self.main_area_setup, text="Get Caliberation Factor", command=lambda: self.send_command("CALIBRATION_FACTOR", self.show_tab_message), style="Custom.TButton")
-        self.caliberate_button.grid(row=4, column=0, padx=10, pady=10,columnspan=2,sticky='e')  
+        self.caliberate_button.grid(row=4, column=0, padx=(5, 20), pady=10,columnspan=2)  
         self.caliberate_button.config(width=20)
 
-        self.show_tab_message = tk.Label(self.main_area_setup, text='start caliberating...',font=("verdana", 14, "bold"))
-        self.show_tab_message.grid(row=5,column=0,columnspan=3,pady=10,padx=10,sticky='s')
+        self.caliberate_button = ttk.Button(self.main_area_setup, text="⭐", command=lambda: self.send_command("SET_THIS", self.show_tab_message))
+        self.caliberate_button.grid(row=4, column=0, padx=(20,0), pady=10, sticky='w')  
+
+        self.caliberate_button = ttk.Button(self.main_area_setup, text="Get Caliberation Factor", command=lambda: self.send_command("CALIBRATION_FACTOR", self.show_tab_message), style="Custom.TButton")
+        self.caliberate_button.grid(row=4, column=1, padx=(20,5), pady=10,columnspan=2)  
+        self.caliberate_button.config(width=20)
+
+        self.message_frame = tk.Frame(self.setup_tab, bg='#33cccc')
+        self.message_frame.place(relx=0.5, rely=0.8, anchor="center")
+
+
+        self.show_tab_message = tk.Label(self.message_frame, text='start caliberating...',font=("verdana", 14, "bold"))
+        self.show_tab_message.grid(row=7,column=0,columnspan=3,pady=10,padx=10,sticky='s')
 
     def send_command(self, command, label):
         if self.ser:
+            self.ser.reset_input_buffer()  # Clear serial input buffer
             self.ser.write(command.encode('utf-8'))
             self.log_error(f"{command} Button Clicked")
-            
+
             try:
                 get_message = self.ser.readline().decode("utf-8").strip()
                 label.config(text=f"{command} : {get_message}")
+
+                self.log_error(get_message)
 
             except UnicodeDecodeError as e:
                 self.log_error(f"UnicodeDecodeError: {e}")
@@ -358,6 +370,7 @@ class LoadCellApp(tk.Tk):
 
     def get_load(self, command, label):
         if self.ser:
+            self.ser.reset_input_buffer()  # Clear serial input buffer
             self.show_sample_weight()
             load_value = self.sample_weight_entry.get()
             if load_value:
@@ -373,10 +386,11 @@ class LoadCellApp(tk.Tk):
                     label.config(text="Invalid Entry: Enter a valid number.")
             else:
                 label.config(text="Empty or Invalid Entry.")
-                self.log_error("Empty or Invalid sample weight entry")
+                self.log_error("Empty or Invalid sample weight entry")    
         else:
             self.log_error("Serial connection not established.")
             label.config(text="Serial connection error.")
+
 
     def validate_float(self, new_text):
         if not new_text:

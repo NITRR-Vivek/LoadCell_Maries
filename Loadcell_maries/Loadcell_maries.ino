@@ -7,15 +7,6 @@ const int LOADCELL_SCK_PIN = 4;
 const char *pin = "1234";
 String device_name = "ESP32-LoadCell";
 
-#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
-#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
-#endif
-
-#if !defined(CONFIG_BT_SPP_ENABLED)
-#error Serial Bluetooth not available or not enabled. It is only available for the ESP32 chip.
-#endif
-
-
 HX711 scale;
 
 float loaded_val;
@@ -28,7 +19,7 @@ bool send_weight = false;
 BluetoothSerial SerialBT;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(500000);
   Serial.println("LoadCell Interfacing with ESP32 ");
   SerialBT.begin(device_name);
   Serial.printf("The device with name \"%s\" is started.\nNow you can pair it with Bluetooth!\n", device_name.c_str());
@@ -41,31 +32,25 @@ void setup() {
 }
 
 void loop() {
-  //USB Serial Comm
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    command.trim(); // Remove leading and trailing whitespaces
-    processCommand(command);
-  }
-  
-  // Bluetooth Serial Comm
-  if (SerialBT.available() > 0) {
-    String command = SerialBT.readStringUntil('\n');
-    command.trim(); // Remove leading and trailing whitespaces
-    processCommand(command);
-  }
+
+  handleSerialCommunication(Serial);
+  handleSerialCommunication(SerialBT);
 
   if (send_weight) {
-    Serial.println(scale.get_units(10), 1);
-    scale.power_down();
-    delay(10);
-    scale.power_up();
+    Serial.println(scale.get_units(3), 1);
+    SerialBT.println(scale.get_units(3), 1);
+  }
+}
+void handleSerialCommunication(Stream& stream){
+  if (stream.available() > 0) {
+    String command = stream.readStringUntil('\n');
+    command.trim(); // Remove leading and trailing whitespaces
+    processCommand(command);
   }
 }
 
 void processCommand(String command) {
   if (command == "ON") {
-      // Read CLF value from flash memory and set the scale
       EEPROM.begin(sizeof(CLF));
       EEPROM.get(0, CLF);
       EEPROM.end();
@@ -77,10 +62,12 @@ void processCommand(String command) {
       scale.tare();
     } else if (command.equals("ZERO_LOAD")) {
       zero_val = scale.get_units(5);
+      SerialBT.println(zero_val);
       Serial.println(zero_val);
     } else if (command.equals("LOADED_VALUE")) { 
       loaded_val = scale.get_units(5);
       Serial.println(loaded_val);
+      SerialBT.println(loaded_val);
     } else if (command.equals("GET_LOAD")) {
       while (!Serial.available()) {
         delay(10);
@@ -91,14 +78,48 @@ void processCommand(String command) {
       if (weight != 0.0) {
         CLF = (loaded_val - zero_val) / weight;
         Serial.println(CLF);
+        SerialBT.println(CLF);
+        
       } else {
-        Serial.println("Error: Weight is zero, cannot calculate CLF");
+        EEPROM.begin(sizeof(CLF)); 
+        EEPROM.get(0, CLF); 
+        EEPROM.end(); 
+        Serial.print("Error: Weight is zero, cannot calculate CLF. Previously Loaded CLF is: ");
+        Serial.println(CLF);
+        SerialBT.print("Error: Weight is zero, cannot calculate CLF. Previously Loaded CLF is: ");
+        SerialBT.println(CLF);
+
       }
     } else if (command.equals("SET_CALIBRATION")) {
+      if (weight != 0.0) {
       // Write CLF value to flash memory
-      EEPROM.begin(sizeof(CLF));
-      EEPROM.put(0, CLF);
-      EEPROM.commit();
-      EEPROM.end();
+        EEPROM.begin(sizeof(CLF));
+        EEPROM.put(0, CLF);
+        bool success = EEPROM.commit();
+        EEPROM.end();
+        if (success) {
+          Serial.println("Calibration factor successfully set.");
+          SerialBT.println("Calibration factor successfully set.");
+        } else {
+          Serial.println("Error: Failed to write calibration factor to EEPROM.");
+          SerialBT.println("Error: Failed to write calibration factor to EEPROM.");
+        }
+      }else {
+        Serial.println("Error: Weight is zero, cannot set the Calibration factor");
+        SerialBT.println("Error: Weight is zero, cannot set the Calibration factor");
+      }
+    } else if (command.equals("SET_THIS")){
+        CLF = -310.47;
+        EEPROM.begin(sizeof(CLF));
+        EEPROM.put(0, CLF);
+        bool success = EEPROM.commit();
+        EEPROM.end();
+        if (success) {
+          Serial.println("Calibration factor is -310.47 set.");
+          SerialBT.println("Calibration factor is -310.47 set.");
+        } else {
+          Serial.println("Error: Failed to write calibration factor to EEPROM.");
+          SerialBT.println("Error: Failed to write calibration factor to EEPROM.");
+        }
     }
 }
