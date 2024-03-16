@@ -241,6 +241,8 @@ void processCommand(String command) {
             ► Click on START Button to Start taking the weight reading.
             ► Click on STOP Button to Stop taking the weight reading.
             ► Click on TARE Button to reset the Scale to Zero.
+            ► When Clicking on Stop Button a Prompt will open. 
+            ► Click on 'Yes' to Save the reading and choose file name and folder.
             ► Check the Error Log Box for any errors in functioning.
 
          
